@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -35,9 +36,9 @@ class _BirthdayListPageState extends ConsumerState<BirthdayListPage> {
       }
     }
     await ref.read(notificationServiceProvider).requestPermissions();
-    // Register the weekly background sync the first time we have permission.
+    // Register background jobs the first time we have permission.
     // ExistingPeriodicWorkPolicy.keep makes this idempotent on subsequent runs.
-    await registerWeeklySync();
+    await registerBackgroundJobs();
     await _sync();
   }
 
@@ -126,12 +127,24 @@ class _BirthdayListPageState extends ConsumerState<BirthdayListPage> {
                             ),
                             title: Text(b.birthday.displayName),
                             subtitle: Text('$date • $until$age'),
+                            onTap: () => _openContact(b.birthday.contactId),
                           );
                         },
                       ),
               ),
             ),
     );
+  }
+
+  Future<void> _openContact(String contactId) async {
+    try {
+      await FlutterContacts.native.showViewer(contactId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Couldn't open contact: $e")));
+    }
   }
 
   static String _initials(String name) {

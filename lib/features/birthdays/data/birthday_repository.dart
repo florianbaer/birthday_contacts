@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../notifications/notification_scheduler.dart';
+import '../../widget/widget_publisher.dart';
 import '../domain/birthday.dart';
 import 'birthday_local_cache.dart';
 import 'contacts_source.dart';
@@ -12,11 +13,13 @@ class BirthdayRepository {
     required this.contacts,
     required this.cache,
     required this.scheduler,
+    this.widgetPublisher = const WidgetPublisher(),
   });
 
   final ContactsSource contacts;
   final BirthdayLocalCache cache;
   final NotificationScheduler scheduler;
+  final WidgetPublisher widgetPublisher;
 
   static const _lastSyncedKey = 'last_synced_at';
 
@@ -37,6 +40,7 @@ class BirthdayRepository {
     final fresh = await contacts.readBirthdays();
     await cache.replaceAll(fresh);
     await scheduler.reconcile(fresh);
+    await widgetPublisher.publish(fresh);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastSyncedKey, DateTime.now().toIso8601String());
   }
