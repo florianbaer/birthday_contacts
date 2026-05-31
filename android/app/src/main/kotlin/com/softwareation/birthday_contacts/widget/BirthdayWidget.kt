@@ -15,6 +15,7 @@ import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
@@ -47,6 +48,11 @@ import es.antonborri.home_widget.actionStartActivity
 import org.json.JSONArray
 
 class BirthdayWidget : GlanceAppWidget() {
+    // Exact (not the default Single) so LocalSize reflects the widget's real
+    // size — otherwise it always reports the min size and we'd never reach the
+    // multi-row FullView.
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override val stateDefinition: GlanceStateDefinition<HomeWidgetGlanceState> =
         HomeWidgetGlanceStateDefinition()
 

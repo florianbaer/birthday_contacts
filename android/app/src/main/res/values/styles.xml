@@ -15,4 +15,10 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <!-- Widget configuration screen. A normal (non-floating) theme so the OS
+         paints a starting window immediately during process cold-start, instead
+         of leaving the user staring at the home screen until the dialog draws. -->
+    <style name="WidgetConfigTheme" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
 </resources>
