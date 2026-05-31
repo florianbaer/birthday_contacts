@@ -19,7 +19,7 @@ import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.color.ColorProvider
+import androidx.glance.unit.ColorProvider
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -223,7 +223,7 @@ class BirthdayWidget : GlanceAppWidget() {
                 .fillMaxWidth()
                 .height(1.dp)
                 .padding(horizontal = 8.dp)
-                .background(GlanceTheme.colors.outlineVariant),
+                .background(GlanceTheme.colors.outline),
         ) {}
     }
 
