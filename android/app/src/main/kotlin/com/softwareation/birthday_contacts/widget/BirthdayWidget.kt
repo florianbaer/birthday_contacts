@@ -14,6 +14,7 @@ import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
@@ -50,17 +51,19 @@ class BirthdayWidget : GlanceAppWidget() {
         HomeWidgetGlanceStateDefinition()
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val lookaheadDays = WidgetConfig.read(context, appWidgetId)
         provideContent {
             GlanceTheme {
-                Content(context, currentState())
+                Content(context, currentState(), lookaheadDays)
             }
         }
     }
 
     @Composable
-    private fun Content(context: Context, state: HomeWidgetGlanceState) {
+    private fun Content(context: Context, state: HomeWidgetGlanceState, lookaheadDays: Int) {
         val json = state.preferences.getString("widget_upcoming_week_json", "[]") ?: "[]"
-        val entries = parseEntries(json)
+        val entries = visibleEntries(parseEntries(json), lookaheadDays)
 
         Box(
             modifier = GlanceModifier
@@ -71,7 +74,7 @@ class BirthdayWidget : GlanceAppWidget() {
                 .clickable(actionStartActivity<MainActivity>(context)),
         ) {
             when {
-                entries.isEmpty() -> EmptyState()
+                entries.isEmpty() -> EmptyState(lookaheadDays)
                 LocalSize.current.height.value < 140f -> CompactView(entries.first())
                 else -> FullView(entries)
             }
@@ -79,7 +82,11 @@ class BirthdayWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun EmptyState() {
+    private fun EmptyState(lookaheadDays: Int) {
+        val text = when (lookaheadDays) {
+            1 -> "No birthdays today"
+            else -> "No birthdays in the next $lookaheadDays days"
+        }
         Column(
             modifier = GlanceModifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
@@ -88,7 +95,7 @@ class BirthdayWidget : GlanceAppWidget() {
             CakeIcon(size = 28.dp, tint = GlanceTheme.colors.primary)
             Spacer(GlanceModifier.height(8.dp))
             Text(
-                text = "No birthdays this week",
+                text = text,
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
                     fontSize = 13.sp,
@@ -100,15 +107,16 @@ class BirthdayWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactView(e: Entry) {
+        val isToday = e.daysUntil == 0
         Row(
             modifier = GlanceModifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(name = e.name)
+            Avatar(name = e.name, highlighted = isToday)
             Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
-                    text = e.name,
+                    text = if (isToday) "🎉 ${e.name}" else e.name,
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurface,
                         fontSize = 15.sp,
@@ -118,16 +126,16 @@ class BirthdayWidget : GlanceAppWidget() {
                 )
                 Spacer(GlanceModifier.height(2.dp))
                 Text(
-                    text = e.label,
+                    text = secondaryLabel(e),
                     style = TextStyle(
                         color = GlanceTheme.colors.primary,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                     ),
                     maxLines = 1,
                 )
             }
-            DateBadge(monthDay = e.monthDay, today = e.daysUntil == 0)
+            DateBadge(monthDay = e.monthDay, today = isToday)
         }
     }
 
@@ -191,7 +199,7 @@ class BirthdayWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
-                    text = e.name,
+                    text = if (isToday) "🎉 ${e.name}" else e.name,
                     style = TextStyle(
                         color = if (isToday) GlanceTheme.colors.onPrimaryContainer
                         else GlanceTheme.colors.onSurface,
@@ -202,12 +210,12 @@ class BirthdayWidget : GlanceAppWidget() {
                 )
                 Spacer(GlanceModifier.height(2.dp))
                 Text(
-                    text = if (e.age != null) "${e.label} • turns ${e.age}" else e.label,
+                    text = secondaryLabel(e),
                     style = TextStyle(
                         color = if (isToday) GlanceTheme.colors.onPrimaryContainer
                         else GlanceTheme.colors.primary,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
                     ),
                     maxLines = 1,
                 )
@@ -307,34 +315,47 @@ class BirthdayWidget : GlanceAppWidget() {
         return "${parts.first().first().uppercaseChar()}${parts.last().first().uppercaseChar()}"
     }
 
-    private data class Entry(
-        val name: String,
-        val monthDay: String,
-        val label: String,
-        val age: Int?,
-        val daysUntil: Int,
-    )
+}
 
-    private fun parseEntries(json: String): List<Entry> {
-        return try {
-            val arr = JSONArray(json)
-            buildList(arr.length()) {
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    add(
-                        Entry(
-                            name = o.optString("name"),
-                            monthDay = o.optString("monthDay"),
-                            label = o.optString("label"),
-                            age = if (o.isNull("age")) null else o.optInt("age"),
-                            daysUntil = if (o.isNull("daysUntil")) 99 else o.optInt("daysUntil"),
-                        ),
-                    )
-                }
+internal data class Entry(
+    val name: String,
+    val monthDay: String,
+    val label: String,
+    val age: Int?,
+    val daysUntil: Int,
+)
+
+/**
+ * Trim the published (up to a year) superset to this instance's window:
+ * a look-ahead of N days shows daysUntil in 0..N-1 (so N=7 == today + 6).
+ */
+internal fun visibleEntries(entries: List<Entry>, lookaheadDays: Int): List<Entry> =
+    entries.filter { it.daysUntil in 0..(lookaheadDays - 1) }
+
+/** Secondary line: emphasizes today and appends the age when known. */
+internal fun secondaryLabel(e: Entry): String {
+    val label = if (e.daysUntil == 0) "Today!" else e.label
+    return if (e.age != null) "$label • turns ${e.age}" else label
+}
+
+internal fun parseEntries(json: String): List<Entry> {
+    return try {
+        val arr = JSONArray(json)
+        buildList(arr.length()) {
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                add(
+                    Entry(
+                        name = o.optString("name"),
+                        monthDay = o.optString("monthDay"),
+                        label = o.optString("label"),
+                        age = if (o.isNull("age")) null else o.optInt("age"),
+                        daysUntil = if (o.isNull("daysUntil")) 99 else o.optInt("daysUntil"),
+                    ),
+                )
             }
-        } catch (_: Throwable) {
-            emptyList()
         }
+    } catch (_: Throwable) {
+        emptyList()
     }
-
 }

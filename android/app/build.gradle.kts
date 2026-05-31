@@ -58,4 +58,6 @@ dependencies {
     // Jetpack Glance — Compose-based home-screen widgets.
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
+
+    testImplementation("junit:junit:4.13.2")
 }

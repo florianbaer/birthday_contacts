@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_description">Upcoming contact birthdays this week</string>
+    <string name="widget_description">Upcoming contact birthdays</string>
+
+    <!-- Widget configuration screen -->
+    <string name="widget_config_title">Show birthdays within</string>
+    <string name="widget_config_today">Today only</string>
+    <string name="widget_config_week">1 week</string>
+    <string name="widget_config_two_weeks">2 weeks</string>
+    <string name="widget_config_month">1 month</string>
+    <string name="widget_config_custom">Custom (days)</string>
+    <string name="widget_config_custom_hint">Days (1–365)</string>
+    <string name="widget_config_save">Save</string>
 </resources>

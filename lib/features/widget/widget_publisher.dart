@@ -6,8 +6,40 @@ import 'package:home_widget/home_widget.dart';
 import '../../core/date_utils.dart';
 import '../birthdays/domain/birthday.dart';
 
-/// Pushes the next-7-days subset of birthdays to the Android home-screen
-/// widget. See SPEC-W1/W2 in the plan file.
+/// Maximum look-ahead the publisher emits. Each widget instance applies its own
+/// (smaller) window natively, so we publish up to a full year and let the
+/// Android widget filter by its per-instance "show within N days" setting.
+const maxWindowDays = 365;
+
+/// Builds the JSON-ready widget entries for [all] relative to [now]: maps each
+/// birthday to its next occurrence, keeps those within [maxDays], and sorts by
+/// next occurrence ascending (so today sorts first).
+///
+/// Pure and platform-channel-free so it can be unit-tested directly.
+List<Map<String, Object?>> buildWidgetEntries(
+  List<Birthday> all,
+  DateTime now, {
+  int maxDays = maxWindowDays,
+}) {
+  final upcoming =
+      all
+          .map((b) {
+            final next = nextOccurrence(month: b.month, day: b.day, now: now);
+            return _Entry(
+              birthday: b,
+              nextOccurrence: next,
+              daysUntil: daysUntil(next, now),
+              age: ageOnNextOccurrence(birthYear: b.year, nextOcc: next),
+            );
+          })
+          .where((e) => e.daysUntil >= 0 && e.daysUntil <= maxDays)
+          .toList()
+        ..sort((a, b) => a.nextOccurrence.compareTo(b.nextOccurrence));
+  return upcoming.map((e) => e.toJson()).toList(growable: false);
+}
+
+/// Pushes up to a year of upcoming birthdays to the Android home-screen widget.
+/// The widget itself trims this to each instance's configured look-ahead window.
 class WidgetPublisher {
   static const _payloadKey = 'widget_upcoming_week_json';
   static const _generatedAtKey = 'widget_generated_at_iso';
@@ -19,28 +51,7 @@ class WidgetPublisher {
   Future<void> publish(List<Birthday> all, {DateTime? now}) async {
     if (!Platform.isAndroid) return; // iOS widget not yet implemented.
     final clock = now ?? DateTime.now();
-    final upcoming =
-        all
-            .map((b) {
-              final next = nextOccurrence(
-                month: b.month,
-                day: b.day,
-                now: clock,
-              );
-              return _Entry(
-                birthday: b,
-                nextOccurrence: next,
-                daysUntil: daysUntil(next, clock),
-                age: ageOnNextOccurrence(birthYear: b.year, nextOcc: next),
-              );
-            })
-            .where((e) => e.daysUntil >= 0 && e.daysUntil <= 6)
-            .toList()
-          ..sort((a, b) => a.nextOccurrence.compareTo(b.nextOccurrence));
-
-    final payload = jsonEncode(
-      upcoming.map((e) => e.toJson()).toList(growable: false),
-    );
+    final payload = jsonEncode(buildWidgetEntries(all, clock));
     await HomeWidget.saveWidgetData<String>(_payloadKey, payload);
     await HomeWidget.saveWidgetData<String>(
       _generatedAtKey,

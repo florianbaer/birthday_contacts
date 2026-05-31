@@ -11,4 +11,6 @@
     android:description="@string/widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewLayout="@layout/birthday_widget_preview"
+    android:configure="com.softwareation.birthday_contacts.widget.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
     android:updatePeriodMillis="0" />
