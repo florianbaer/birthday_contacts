@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../application/providers.dart';
 import '../application/sync_service.dart';
 import '../data/birthday_repository.dart';
+import 'widgets/birthday_search_delegate.dart';
 
 class BirthdayListPage extends ConsumerStatefulWidget {
   const BirthdayListPage({super.key});
@@ -69,6 +70,11 @@ class _BirthdayListPageState extends ConsumerState<BirthdayListPage> {
       appBar: AppBar(
         title: const Text('Birthdays'),
         actions: [
+          IconButton(
+            tooltip: 'Search',
+            icon: const Icon(Icons.search),
+            onPressed: () => _openSearch(list.value ?? const []),
+          ),
           IconButton(
             tooltip: 'Sync now',
             icon: _syncing
@@ -134,6 +140,14 @@ class _BirthdayListPageState extends ConsumerState<BirthdayListPage> {
               ),
             ),
     );
+  }
+
+  Future<void> _openSearch(List<UpcomingBirthday> all) async {
+    final selected = await showSearch<UpcomingBirthday?>(
+      context: context,
+      delegate: BirthdaySearchDelegate(all),
+    );
+    if (selected != null) await _openContact(selected.birthday.contactId);
   }
 
   Future<void> _openContact(String contactId) async {
