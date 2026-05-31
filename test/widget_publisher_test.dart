@@ -2,12 +2,7 @@ import 'package:birthday_contacts/features/birthdays/domain/birthday.dart';
 import 'package:birthday_contacts/features/widget/widget_publisher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Birthday _b(
-  String name, {
-  required int month,
-  required int day,
-  int? year,
-}) =>
+Birthday _b(String name, {required int month, required int day, int? year}) =>
     Birthday(
       contactId: name,
       displayName: name,
@@ -43,10 +38,7 @@ void main() {
     test('boundary: daysUntil == maxDays included, maxDays+1 excluded', () {
       // now = Jun 14. +5 days = Jun 19, +6 days = Jun 20.
       final entries = buildWidgetEntries(
-        [
-          _b('In5', month: 6, day: 19),
-          _b('In6', month: 6, day: 20),
-        ],
+        [_b('In5', month: 6, day: 19), _b('In6', month: 6, day: 20)],
         now,
         maxDays: 5,
       );
