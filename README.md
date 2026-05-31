@@ -89,7 +89,18 @@ flutter build apk --debug
 1. `dart format --set-exit-if-changed .`
 2. `flutter analyze`
 3. `flutter test`
-4. `flutter build apk --debug` — uploaded as the `app-debug-apk` artifact.
+4. `flutter build apk --debug` (Linux) — uploaded as `app-debug-apk`.
+5. `flutter build ios --no-codesign --debug` (macOS) — uploaded as `app-ios-debug`.
+
+### Releases
+
+`.github/workflows/release.yml` runs when a tag matching `v*` is pushed
+(e.g. `git tag v0.1.0 && git push origin v0.1.0`). It builds release APK +
+AAB on Linux and a release `Runner.app.zip` on macOS (still `--no-codesign`
+in CI), then attaches all three to a GitHub Release with auto-generated
+notes. Android release builds currently use the debug signing config —
+swap in a real keystore via repository secrets before publishing to the
+Play Store.
 
 ## Known caveats
 
@@ -97,9 +108,11 @@ flutter build apk --debug
   Gradle script that conditionally skips applying its Kotlin plugin on AGP 9,
   which leaves the plugin's classes unresolved. Bump back to AGP 9 once the
   plugin ships a Built-in-Kotlin compatible release.
-- **iOS is deferred.** The Flutter code is platform-aware (`WidgetPublisher`
-  no-ops on iOS, contacts plugin works) but no iOS widget, no BGTaskScheduler
-  identifier, and Xcode signing has never been configured.
+- **iOS app + background sync + notifications run.** The **iOS home-screen
+  widget is deferred** — WidgetKit needs a Widget Extension target that's
+  easiest to scaffold in Xcode (`File → New Target → Widget Extension`).
+  Running on a real iPhone requires opening `ios/Runner.xcworkspace` once to
+  set the development team for signing; CI builds with `--no-codesign`.
 - **Feb 29 birthdays** notify on **Mar 1** in non-leap years (documented in
   `lib/core/date_utils.dart`).
 - Code generation is gitignored (`*.g.dart`); run `dart run build_runner build`
