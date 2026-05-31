@@ -2,33 +2,44 @@ package com.softwareation.birthday_contacts.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.color.ColorProvider
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import com.softwareation.birthday_contacts.MainActivity
-import es.antonborri.home_widget.HomeWidgetBackgroundIntent
+import com.softwareation.birthday_contacts.R
 import es.antonborri.home_widget.HomeWidgetGlanceState
 import es.antonborri.home_widget.HomeWidgetGlanceStateDefinition
 import es.antonborri.home_widget.actionStartActivity
@@ -48,120 +59,252 @@ class BirthdayWidget : GlanceAppWidget() {
 
     @Composable
     private fun Content(context: Context, state: HomeWidgetGlanceState) {
-        val prefs = state.preferences
-        val json = prefs.getString("widget_upcoming_week_json", "[]") ?: "[]"
+        val json = state.preferences.getString("widget_upcoming_week_json", "[]") ?: "[]"
         val entries = parseEntries(json)
 
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
-                .padding(12.dp)
+                .cornerRadius(24.dp)
+                .padding(14.dp)
                 .clickable(actionStartActivity<MainActivity>(context)),
         ) {
             when {
                 entries.isEmpty() -> EmptyState()
-                LocalSize.current.height.value < 140f -> CompactRow(entries.first())
-                else -> FullList(entries)
+                LocalSize.current.height.value < 140f -> CompactView(entries.first())
+                else -> FullView(entries)
             }
         }
     }
 
     @Composable
     private fun EmptyState() {
-        Box(
+        Column(
             modifier = GlanceModifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            CakeIcon(size = 28.dp, tint = GlanceTheme.colors.primary)
+            Spacer(GlanceModifier.height(8.dp))
             Text(
                 text = "No birthdays this week",
                 style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = 14.sp,
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
                 ),
             )
         }
     }
 
     @Composable
-    private fun CompactRow(e: Entry) {
+    private fun CompactView(e: Entry) {
         Row(
             modifier = GlanceModifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Avatar(name = e.name)
+            Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
                     text = e.name,
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurface,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    maxLines = 1,
+                )
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    text = e.label,
+                    style = TextStyle(
+                        color = GlanceTheme.colors.primary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     ),
                     maxLines = 1,
                 )
-                Text(
-                    text = "${e.monthDay} • ${e.label}",
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 12.sp,
-                    ),
-                    maxLines = 1,
-                )
+            }
+            DateBadge(monthDay = e.monthDay, today = e.daysUntil == 0)
+        }
+    }
+
+    @Composable
+    private fun FullView(entries: List<Entry>) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            Header(count = entries.size)
+            Spacer(GlanceModifier.height(8.dp))
+            LazyColumn(modifier = GlanceModifier.fillMaxWidth()) {
+                items(entries, itemId = { it.name.hashCode().toLong() }) { entry ->
+                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                        EntryRow(entry)
+                        Divider()
+                    }
+                }
             }
         }
     }
 
     @Composable
-    private fun FullList(entries: List<Entry>) {
-        Column(modifier = GlanceModifier.fillMaxSize()) {
+    private fun Header(count: Int) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CakeIcon(size = 18.dp, tint = GlanceTheme.colors.primary)
+            Spacer(GlanceModifier.width(8.dp))
             Text(
                 text = "Birthdays",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                 ),
             )
-            Spacer(GlanceModifier.padding(top = 6.dp))
-            LazyColumn(modifier = GlanceModifier.fillMaxWidth()) {
-                items(entries) { entry -> EntryRow(entry) }
-            }
+            Spacer(GlanceModifier.defaultWeight())
+            Text(
+                text = "$count",
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+            )
         }
     }
 
     @Composable
     private fun EntryRow(e: Entry) {
+        val isToday = e.daysUntil == 0
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .background(
+                    if (isToday) GlanceTheme.colors.primaryContainer
+                    else ColorProvider(Color.Transparent)
+                )
+                .cornerRadius(14.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Avatar(name = e.name, highlighted = isToday)
+            Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
                     text = e.name,
                     style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
+                        color = if (isToday) GlanceTheme.colors.onPrimaryContainer
+                        else GlanceTheme.colors.onSurface,
                         fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    maxLines = 1,
+                )
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    text = if (e.age != null) "${e.label} • turns ${e.age}" else e.label,
+                    style = TextStyle(
+                        color = if (isToday) GlanceTheme.colors.onPrimaryContainer
+                        else GlanceTheme.colors.primary,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                     ),
                     maxLines = 1,
                 )
-                Text(
-                    text = e.label,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 12.sp,
-                    ),
-                    maxLines = 1,
-                )
             }
+            DateBadge(monthDay = e.monthDay, today = isToday)
+        }
+    }
+
+    @Composable
+    private fun Divider() {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .padding(horizontal = 8.dp)
+                .background(GlanceTheme.colors.outlineVariant),
+        ) {}
+    }
+
+    @Composable
+    private fun DateBadge(monthDay: String, today: Boolean) {
+        // "Jun 14" → month "Jun" + day "14"
+        val parts = monthDay.split(' ', limit = 2)
+        val month = parts.getOrNull(0)?.uppercase() ?: ""
+        val day = parts.getOrNull(1) ?: ""
+        Column(
+            modifier = GlanceModifier
+                .background(
+                    if (today) GlanceTheme.colors.primary
+                    else GlanceTheme.colors.secondaryContainer
+                )
+                .cornerRadius(12.dp)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(
-                text = e.monthDay,
+                text = month,
                 style = TextStyle(
-                    color = GlanceTheme.colors.onSurfaceVariant,
-                    fontSize = 12.sp,
+                    color = if (today) GlanceTheme.colors.onPrimary
+                    else GlanceTheme.colors.onSecondaryContainer,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+            Text(
+                text = day,
+                style = TextStyle(
+                    color = if (today) GlanceTheme.colors.onPrimary
+                    else GlanceTheme.colors.onSecondaryContainer,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                 ),
             )
         }
+    }
+
+    @Composable
+    private fun Avatar(name: String, highlighted: Boolean = false) {
+        val palette = listOf(
+            0xFFEF5350L, 0xFFAB47BCL, 0xFF5C6BC0L, 0xFF26A69AL,
+            0xFFFFA726L, 0xFF8D6E63L, 0xFF26C6DAL, 0xFF66BB6AL,
+        )
+        val bg = Color(palette[(name.hashCode() and 0x7FFFFFFF) % palette.size])
+        Box(
+            modifier = GlanceModifier
+                .size(36.dp)
+                .background(if (highlighted) GlanceTheme.colors.primary else ColorProvider(bg))
+                .cornerRadius(18.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initials(name),
+                style = TextStyle(
+                    color = if (highlighted) GlanceTheme.colors.onPrimary
+                    else ColorProvider(Color.White),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+        }
+    }
+
+    @Composable
+    private fun CakeIcon(size: androidx.compose.ui.unit.Dp, tint: ColorProvider) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_cake),
+            contentDescription = null,
+            modifier = GlanceModifier.size(size),
+            colorFilter = ColorFilter.tint(tint),
+        )
+    }
+
+    private fun initials(name: String): String {
+        val parts = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return "?"
+        if (parts.size == 1) return parts[0].first().uppercaseChar().toString()
+        return "${parts.first().first().uppercaseChar()}${parts.last().first().uppercaseChar()}"
     }
 
     private data class Entry(
@@ -169,6 +312,7 @@ class BirthdayWidget : GlanceAppWidget() {
         val monthDay: String,
         val label: String,
         val age: Int?,
+        val daysUntil: Int,
     )
 
     private fun parseEntries(json: String): List<Entry> {
@@ -183,6 +327,7 @@ class BirthdayWidget : GlanceAppWidget() {
                             monthDay = o.optString("monthDay"),
                             label = o.optString("label"),
                             age = if (o.isNull("age")) null else o.optInt("age"),
+                            daysUntil = if (o.isNull("daysUntil")) 99 else o.optInt("daysUntil"),
                         ),
                     )
                 }
@@ -191,4 +336,5 @@ class BirthdayWidget : GlanceAppWidget() {
             emptyList()
         }
     }
+
 }

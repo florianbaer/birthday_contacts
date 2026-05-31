@@ -72,6 +72,7 @@ class _Entry {
       final d => 'in $d days',
     },
     'age': age,
+    'daysUntil': daysUntil,
   };
 }
 

@@ -66,6 +66,9 @@ jobs:
       - name: Generate Drift code
         run: dart run build_runner build
 
+      - name: flutter precache --ios
+        run: flutter precache --ios
+
       - name: pod install
         working-directory: ios
         run: pod install --repo-update
