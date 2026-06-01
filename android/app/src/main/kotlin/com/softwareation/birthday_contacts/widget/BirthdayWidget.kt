@@ -149,13 +149,10 @@ class BirthdayWidget : GlanceAppWidget() {
     private fun FullView(entries: List<Entry>) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             Header(count = entries.size)
-            Spacer(GlanceModifier.height(8.dp))
+            Spacer(GlanceModifier.height(12.dp))
             LazyColumn(modifier = GlanceModifier.fillMaxWidth()) {
                 items(entries, itemId = { it.name.hashCode().toLong() }) { entry ->
-                    Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        EntryRow(entry)
-                        Divider()
-                    }
+                    EntryRow(entry)
                 }
             }
         }
@@ -228,17 +225,6 @@ class BirthdayWidget : GlanceAppWidget() {
             }
             DateBadge(monthDay = e.monthDay, today = isToday)
         }
-    }
-
-    @Composable
-    private fun Divider() {
-        Box(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .padding(horizontal = 8.dp)
-                .background(GlanceTheme.colors.outline),
-        ) {}
     }
 
     @Composable
