@@ -1,6 +1,7 @@
 package com.softwareation.birthday_contacts.widget
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -81,8 +82,8 @@ class BirthdayWidget : GlanceAppWidget() {
         ) {
             when {
                 entries.isEmpty() -> EmptyState(lookaheadDays)
-                LocalSize.current.height.value < 140f -> CompactView(entries.first())
-                else -> FullView(entries)
+                LocalSize.current.height.value < 140f -> CompactView(context, entries.first())
+                else -> FullView(context, entries)
             }
         }
     }
@@ -112,10 +113,12 @@ class BirthdayWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun CompactView(e: Entry) {
+    private fun CompactView(context: Context, e: Entry) {
         val isToday = e.daysUntil == 0
         Row(
-            modifier = GlanceModifier.fillMaxSize(),
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .clickable(openContactAction(context, e.contactId)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Avatar(name = e.name, highlighted = isToday)
@@ -146,13 +149,13 @@ class BirthdayWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FullView(entries: List<Entry>) {
+    private fun FullView(context: Context, entries: List<Entry>) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             Header(count = entries.size)
             Spacer(GlanceModifier.height(12.dp))
             LazyColumn(modifier = GlanceModifier.fillMaxWidth()) {
                 items(entries, itemId = { it.name.hashCode().toLong() }) { entry ->
-                    EntryRow(entry)
+                    EntryRow(context, entry)
                 }
             }
         }
@@ -184,7 +187,7 @@ class BirthdayWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun EntryRow(e: Entry) {
+    private fun EntryRow(context: Context, e: Entry) {
         val isToday = e.daysUntil == 0
         Row(
             modifier = GlanceModifier
@@ -195,6 +198,7 @@ class BirthdayWidget : GlanceAppWidget() {
                     else ColorProvider(Color.Transparent)
                 )
                 .cornerRadius(14.dp)
+                .clickable(openContactAction(context, e.contactId))
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -300,6 +304,14 @@ class BirthdayWidget : GlanceAppWidget() {
         )
     }
 
+    // Launches the app with a deep link so Flutter can open the system contact
+    // viewer for this contact (see BirthdayListPage's widget-launch handling).
+    private fun openContactAction(context: Context, contactId: String) =
+        actionStartActivity<MainActivity>(
+            context,
+            Uri.parse("birthdaycontacts://contact?id=$contactId"),
+        )
+
     private fun initials(name: String): String {
         val parts = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (parts.isEmpty()) return "?"
@@ -315,6 +327,7 @@ internal data class Entry(
     val label: String,
     val age: Int?,
     val daysUntil: Int,
+    val contactId: String = "",
 )
 
 /**
@@ -343,6 +356,7 @@ internal fun parseEntries(json: String): List<Entry> {
                         label = o.optString("label"),
                         age = if (o.isNull("age")) null else o.optInt("age"),
                         daysUntil = if (o.isNull("daysUntil")) 99 else o.optInt("daysUntil"),
+                        contactId = o.optString("contactId"),
                     ),
                 )
             }

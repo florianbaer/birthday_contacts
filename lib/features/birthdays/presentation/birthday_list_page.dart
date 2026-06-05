@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -19,11 +22,33 @@ class BirthdayListPage extends ConsumerStatefulWidget {
 class _BirthdayListPageState extends ConsumerState<BirthdayListPage> {
   bool _syncing = false;
   String? _error;
+  StreamSubscription<Uri?>? _widgetClickSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _firstRunSync());
+    _initWidgetLaunch();
+  }
+
+  @override
+  void dispose() {
+    _widgetClickSub?.cancel();
+    super.dispose();
+  }
+
+  /// Opens the tapped contact when the app is launched (cold) or resumed (warm)
+  /// from a widget row. The widget encodes the contact as
+  /// `birthdaycontacts://contact?id=<contactId>` (see BirthdayWidget.kt).
+  Future<void> _initWidgetLaunch() async {
+    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+    _handleWidgetUri(await HomeWidget.initiallyLaunchedFromHomeWidget());
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null || uri.host != 'contact') return;
+    final contactId = uri.queryParameters['id'];
+    if (contactId != null && contactId.isNotEmpty) _openContact(contactId);
   }
 
   Future<void> _firstRunSync() async {
