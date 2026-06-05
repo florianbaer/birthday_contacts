@@ -3,15 +3,9 @@ name: Release
 on:
   push:
     tags: ['v*']
-  workflow_call:
-    inputs:
-      tag:
-        description: Tag to build and publish (e.g. v1.2.3).
-        required: false
-        type: string
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -28,8 +22,6 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.tag || github.ref_name }}
 
       - uses: actions/setup-java@v5
         with:
@@ -40,6 +32,16 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      # The pushed tag (vX.Y.Z) is the release version. Patch it into
+      # pubspec.yaml so the APK/AAB versionName matches the tag, and use the
+      # workflow run number as an ever-climbing build/versionCode so Android
+      # installs-over-update never break.
+      - name: Set version from tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -i -E "s/^version:.*/version: ${version}+${GITHUB_RUN_NUMBER}/" pubspec.yaml
+          echo "pubspec version -> ${version}+${GITHUB_RUN_NUMBER}"
 
       - name: flutter pub get
         run: flutter pub get
@@ -81,13 +83,18 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.tag || github.ref_name }}
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      # See note in release-android: the tag drives pubspec's version.
+      - name: Set version from tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -i -E "s/^version:.*/version: ${version}+${GITHUB_RUN_NUMBER}/" pubspec.yaml
+          echo "pubspec version -> ${version}+${GITHUB_RUN_NUMBER}"
 
       - name: flutter pub get
         run: flutter pub get
@@ -135,8 +142,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          name: ${{ inputs.tag || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
