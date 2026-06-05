@@ -119,28 +119,26 @@ jobs:
           retention-days: 14
 
   tag-release:
-    name: Release current version + open next
+    name: Bump version + tag
     needs: analyze-and-test
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      # Model: pubspec.yaml always holds the *next version to release*.
-      #   - push to main  -> release that version as-is (a patch release),
-      #   - manual run     -> jump to the next minor/major first, then release.
-      # After tagging we advance pubspec to the next patch placeholder. The build
-      # number (Android versionCode) only ever increases so installs-over-update
-      # never break. The APK/AAB versionName+versionCode come straight from this
-      # version via flutter.versionName/versionCode (android/app/build.gradle.kts).
-      - name: Compute release + next version
-        id: version
+      # Bump the semver in pubspec.yaml, commit + tag that commit so the built
+      # artifacts carry the new version. The APK/AAB versionName+versionCode come
+      # straight from this version via flutter.versionName/versionCode
+      # (android/app/build.gradle.kts). The build number always climbs so Android
+      # installs-over-update never break.
+      - name: Bump version
+        id: bump
         env:
           # 'patch' on push to main; chosen level on manual dispatch.
           LEVEL: ${{ github.event.inputs.bump || 'patch' }}
@@ -152,43 +150,27 @@ jobs:
           case "$LEVEL" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
             minor) minor=$((minor + 1)); patch=0 ;;
-            patch) ;;  # release the queued version as-is
+            patch) patch=$((patch + 1)) ;;
             *) echo "Unknown bump level: $LEVEL" >&2; exit 1 ;;
           esac
-          release="${major}.${minor}.${patch}+${build}"
+          build=$((build + 1))
+          new="${major}.${minor}.${patch}+${build}"
           tag="v${major}.${minor}.${patch}"
-          # Next placeholder: bump patch, climb the build number.
-          next="${major}.${minor}.$((patch + 1))+$((build + 1))"
-          echo "Releasing ${release} (tag ${tag}); next will be ${next}"
-          {
-            echo "release=${release}"
-            echo "version=${release}"
-            echo "tag=${tag}"
-            echo "next=${next}"
-          } >> "$GITHUB_OUTPUT"
+          sed -i -E "s/^version:.*/version: ${new}/" pubspec.yaml
+          echo "Bumped ${current} -> ${new} (${LEVEL})"
+          echo "version=${new}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
-      - name: Tag release and prepare next iteration
+      - name: Commit and tag
         env:
-          RELEASE: ${{ steps.version.outputs.release }}
-          NEXT: ${{ steps.version.outputs.next }}
-          TAG: ${{ steps.version.outputs.tag }}
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Pin pubspec to the release version and tag that commit so the built
-          # artifacts carry the released version. (No-op commit when LEVEL=patch
-          # since pubspec already holds the release version.)
-          sed -i -E "s/^version:.*/version: ${RELEASE}/" pubspec.yaml
           git add pubspec.yaml
-          git diff --cached --quiet || git commit -m "chore: release ${TAG}"
+          git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
           git tag "${TAG}"
-
-          # Advance pubspec to the next development version.
-          sed -i -E "s/^version:.*/version: ${NEXT}/" pubspec.yaml
-          git add pubspec.yaml
-          git commit -m "chore: prepare next version ${NEXT} [skip ci]"
-
           # Pushes made with GITHUB_TOKEN do not start new workflow runs, so this
           # neither re-triggers CI nor (on its own) the release workflow.
           git push origin HEAD:main
