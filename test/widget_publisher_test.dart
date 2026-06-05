@@ -76,6 +76,15 @@ void main() {
       expect(byName['Later'], 'in 3 days');
     });
 
+    test('contactId carried through for widget tap routing', () {
+      final entries = buildWidgetEntries(
+        [_b('Today', month: 6, day: 14)],
+        now,
+        maxDays: 30,
+      );
+      expect(entries.single['contactId'], 'Today'); // _b sets contactId = name
+    });
+
     test('age populated when year known, null otherwise', () {
       final entries = buildWidgetEntries(
         [

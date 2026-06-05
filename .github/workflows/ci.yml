@@ -3,10 +3,20 @@ name: CI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to bump for this release
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: write  # to push the version-bump commit + tag and call release.yml
 
 jobs:
   analyze-and-test:
@@ -107,3 +117,66 @@ jobs:
           path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 14
+
+  tag-release:
+    name: Bump version + tag
+    needs: analyze-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Bump version
+        id: bump
+        env:
+          # 'patch' on push to main; chosen level on manual dispatch.
+          LEVEL: ${{ github.event.inputs.bump || 'patch' }}
+        run: |
+          current=$(grep -E '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*//')
+          semver=${current%%+*}
+          build=${current##*+}
+          IFS=. read -r major minor patch <<< "$semver"
+          case "$LEVEL" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+            *) echo "Unknown bump level: $LEVEL" >&2; exit 1 ;;
+          esac
+          build=$((build + 1))
+          new="${major}.${minor}.${patch}+${build}"
+          tag="v${major}.${minor}.${patch}"
+          sed -i -E "s/^version:.*/version: ${new}/" pubspec.yaml
+          echo "Bumped ${current} -> ${new} (${LEVEL})"
+          echo "version=${new}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
+          git tag "${TAG}"
+          # Pushes made with GITHUB_TOKEN do not start new workflow runs, so this
+          # neither re-triggers CI nor (on its own) the release workflow.
+          git push origin HEAD:main
+          git push origin "${TAG}"
+
+  release:
+    name: Build + publish release
+    needs: tag-release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag-release.outputs.tag }}
+    secrets: inherit

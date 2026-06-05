@@ -75,6 +75,7 @@ class _Entry {
   final int? age;
 
   Map<String, Object?> toJson() => {
+    'contactId': birthday.contactId,
     'name': birthday.displayName,
     'monthDay': _formatMonthDay(nextOccurrence),
     'label': switch (daysUntil) {
